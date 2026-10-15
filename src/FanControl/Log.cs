@@ -2,7 +2,7 @@ namespace FanControl;
 
 /// <summary>
 /// Small append-only log, trimmed past 512 KB. The window logs to %AppData%\FanControl, the
-/// service to %ProgramData%\FanControl.
+/// service to <see cref="ServiceFolder"/>.
 /// </summary>
 internal static class Log
 {
@@ -11,8 +11,13 @@ internal static class Log
     public static string UserFolder { get; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "FanControl");
 
-    public static string MachineFolder { get; } =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "FanControl");
+    /// <summary>
+    /// Local app data of the account running this process. For the service (LocalSystem) that is
+    /// C:\Windows\System32\config\systemprofile\AppData\Local\FanControl, which standard users
+    /// can't write. %ProgramData% would let them plant links for SYSTEM to follow.
+    /// </summary>
+    public static string ServiceFolder { get; } =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FanControl");
 
     // Declared after the folders: static initializers run in source order.
     static string _file = Path.Combine(UserFolder, "log.txt");

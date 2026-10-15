@@ -17,17 +17,17 @@ public static class Program
 
         if (options.Service)
         {
-            Log.UseFile(Log.MachineFolder, "service.log");
+            Log.UseFile(Log.ServiceFolder, "service.log");
             ServiceBase.Run(new FanService());
             return 0;
         }
         if (options.InstallService)
         {
-            Log.UseFile(Log.MachineFolder, "setup.log");
+            Log.UseFile(Log.ServiceFolder, "setup.log");
             try { return ServiceSetup.Install(); }
             catch (Exception ex) { Log.Write($"Service install failed: {ex}"); return 1; }
         }
-        if (options.Diag) return Diagnostics.Run();
+        if (options.Diag) return Diagnostics.Run(options.Sweep);
 
         SetCurrentProcessExplicitAppUserModelID(AppUserModelId);
 

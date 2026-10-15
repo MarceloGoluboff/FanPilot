@@ -16,19 +16,27 @@ public partial class MainWindow : FluentWindow
         _vm = vm;
         DataContext = vm;
         InitializeComponent();
+        FitToWorkArea();
 
         Editor.Curve = vm.CurveForEditor();
         Editor.MinPercent = vm.MinManualPercent;
         Editor.CurveChanged += () => vm.CurveEdited(Editor.Curve);
         vm.CurveReset += () => Editor.Curve = vm.CurveForEditor();
-        vm.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(MainViewModel.MinManualPercent)) Editor.MinPercent = vm.MinManualPercent;
-        };
         vm.SnapshotReceived += OnSnapshot;
         vm.FansChanged += BuildLegend;
 
         BuildLegend();
+    }
+
+    /// <summary>The content scrolls, so on short screens the window shrinks to fit above the taskbar.</summary>
+    void FitToWorkArea()
+    {
+        var work = SystemParameters.WorkArea;
+        Height = Math.Min(Height, work.Height - 32);
+        Width = Math.Min(Width, work.Width - 32);
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Left = work.Left + (work.Width - Width) / 2;
+        Top = work.Top + (work.Height - Height) / 2;
     }
 
     void OnSnapshot(FanSnapshot s)

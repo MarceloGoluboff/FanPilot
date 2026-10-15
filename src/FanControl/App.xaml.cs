@@ -32,6 +32,16 @@ public partial class App : Application
         DispatcherUnhandledException += OnDispatcherException;
 
         _settings = AppSettings.Load();
+        if (!_settings.SignInEntryCreated)
+        {
+            try
+            {
+                RunAtLogon.Set(true);
+                _settings.SignInEntryCreated = true;
+                _settings.Save();
+            }
+            catch (Exception ex) { Log.Write($"Couldn't add the sign-in entry: {ex.Message}"); }
+        }
         _client = new ServiceClient();
 
         var vm = new MainViewModel(_settings, _client);

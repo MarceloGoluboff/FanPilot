@@ -90,17 +90,23 @@ public sealed class FanController : IDisposable
         }
     }
 
-    /// <summary>Leaves test mode so the firmware controls the fans again.</summary>
+    /// <summary>
+    /// Leaves test mode so the firmware controls the fans again. After release a fan holds its last
+    /// test duty until the EC's next update (several seconds), so it is parked at a moderate duty
+    /// first; releasing from a low duty left both fans stopped at 0 RPM in testing.
+    /// </summary>
     public void RestoreAsusControl()
     {
+        const short parkDuty = 102;   // 40%
         for (int i = 0; i < FanCount; i++)
         {
             lock (_gate)
             {
                 if (_disposed) return;
                 AsusWinIo.HealthyTable_SetFanIndex((byte)i);
+                AsusWinIo.HealthyTable_SetFanTestMode((char)1);
+                AsusWinIo.HealthyTable_SetFanPwmDuty(parkDuty);
                 AsusWinIo.HealthyTable_SetFanTestMode((char)0);
-                AsusWinIo.HealthyTable_SetFanPwmDuty(0);
             }
         }
     }

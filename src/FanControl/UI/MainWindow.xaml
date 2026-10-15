@@ -223,18 +223,6 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel>
-                                <TextBlock Text="Forbid unsafe speeds" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                                <TextBlock Text="Never run the fans below 40%." Style="{StaticResource Secondary}" />
-                            </StackPanel>
-                            <ui:ToggleSwitch Grid.Column="1" IsChecked="{Binding ForbidUnsafe}" IsEnabled="{Binding IsControlEnabled}" />
-                        </Grid>
-
-                        <Grid Style="{StaticResource SettingRow}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel>
                                 <TextBlock Text="Thermal override" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                                 <TextBlock Text="In Manual and Curve modes, force 100% at this CPU temperature." Style="{StaticResource Secondary}" />
                             </StackPanel>

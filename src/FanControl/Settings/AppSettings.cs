@@ -11,6 +11,12 @@ public sealed class AppSettings
     public bool CloseToTray { get; set; } = true;
     public AppTheme Theme { get; set; } = AppTheme.System;
 
+    /// <summary>
+    /// Set once the app has turned on its own sign-in entry. The installer writes one too, but an
+    /// installer started from a packaged app writes into that app's private registry view instead.
+    /// </summary>
+    public bool SignInEntryCreated { get; set; }
+
     static string FilePath => Path.Combine(Log.UserFolder, "settings.json");
 
     static readonly JsonSerializerOptions Json = new()

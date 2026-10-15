@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using FanControl.Hardware;
 
 namespace FanControl.Control;
 
+/// <summary>One poll. <see cref="Time"/> is UTC so a DST change can't reorder samples.</summary>
 public sealed record FanSnapshot(
     DateTime Time,
     int? CpuTemp,
@@ -17,8 +19,11 @@ public sealed record FanSnapshot(
 /// </summary>
 public sealed class FanEngine : IDisposable
 {
-    public const int MinPercent = 20;
-    public const int SafeFloorPercent = 40;
+    /// <summary>
+    /// Lowest duty the app will set. Measured on the Q530VJ: both fans still spin at 10%
+    /// (about 1,100 RPM) and stall at 5%, so 15% leaves margin.
+    /// </summary>
+    public const int MinPercent = 15;
 
     static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(1);
     static readonly TimeSpan ReapplyInterval = TimeSpan.FromSeconds(30);
@@ -27,25 +32,25 @@ public sealed class FanEngine : IDisposable
     const double OverrideRelease = 10;      // C below the override threshold before it lets go
     const double TempSmoothing = 0.35;      // EMA weight for curve input, so short spikes don't surge the fans
     const int MinChange = 2;                // % change worth writing
+    const int MaxMissedTemps = 5;           // polls without a temperature before Manual gives up
 
     readonly FanController _hw;
     readonly object _gate = new();
     readonly AutoResetEvent _wake = new(false);
     Thread? _thread;
-    volatile bool _running;
+    bool _running;   // guarded by _gate
 
     FanConfig _config;
     int? _applied;
-    DateTime _lastApply;
+    TimeSpan _lastApply;
     bool _forceApply = true;
     bool _override;
+    int _missedTemps;
     double? _smoothedTemp;
     double _curveOutput;
-    DateTime? _curveDropSince;
+    TimeSpan? _curveDropSince;
 
     public event Action<FanSnapshot>? Updated;
-
-    public int FanCount => _hw.FanCount;
 
     public FanEngine(FanController hw, FanConfig config)
     {
@@ -53,9 +58,12 @@ public sealed class FanEngine : IDisposable
         _config = config;
     }
 
+    /// <summary>Monotonic time, so clock changes (DST, NTP) can't stall the reapply or hysteresis timers.</summary>
+    static TimeSpan Now => Stopwatch.GetElapsedTime(0);
+
     public void Start()
     {
-        _running = true;
+        lock (_gate) _running = true;
         _thread = new Thread(Loop) { IsBackground = true, Name = "FanEngine" };
         _thread.Start();
     }
@@ -64,7 +72,12 @@ public sealed class FanEngine : IDisposable
     {
         lock (_gate)
         {
-            if (config.Curve != _config.Curve || config.Mode != _config.Mode)
+            if (config.Mode != _config.Mode)
+            {
+                // The smoothed temp isn't updated in ASUS Auto, so it may be stale.
+                _smoothedTemp = null;
+            }
+            if (config.Mode != _config.Mode || !config.SameCurve(_config))
             {
                 _curveOutput = 0;
                 _curveDropSince = null;
@@ -82,13 +95,19 @@ public sealed class FanEngine : IDisposable
         _wake.Set();
     }
 
-    /// <summary>Stops polling and, if asked, gives control back to the firmware.</summary>
+    /// <summary>
+    /// Stops polling and, if asked, gives control back to the firmware. Taking the gate after
+    /// clearing _running means no write can land after the restore, even if the thread is stuck.
+    /// </summary>
     public void Stop(bool restoreAsus)
     {
-        _running = false;
+        lock (_gate) _running = false;
         _wake.Set();
         _thread?.Join(TimeSpan.FromSeconds(3));
-        if (restoreAsus) EmergencyRestore();
+        lock (_gate)
+        {
+            if (restoreAsus) EmergencyRestore();
+        }
     }
 
     /// <summary>Best-effort hand-back to ASUS control; safe to call from crash handlers.</summary>
@@ -100,15 +119,23 @@ public sealed class FanEngine : IDisposable
 
     void Loop()
     {
-        while (_running)
+        try
         {
-            try { Tick(DateTime.Now); }
-            catch (Exception ex) { Log.Write($"Tick failed: {ex}"); }
-            _wake.WaitOne(PollInterval);
+            while (true)
+            {
+                lock (_gate)
+                {
+                    if (!_running) return;
+                }
+                try { Tick(); }
+                catch (Exception ex) { Log.Write($"Tick failed: {ex}"); }
+                _wake.WaitOne(PollInterval);
+            }
         }
+        catch (ObjectDisposedException) { }
     }
 
-    void Tick(DateTime now)
+    void Tick()
     {
         int? temp = null;
         int[] rpms = [];
@@ -125,29 +152,38 @@ public sealed class FanEngine : IDisposable
         lock (_gate)
         {
             if (!_running) return;
+            var now = Now;
             int? target = ComputeTarget(temp, now);
             try { Apply(target, now); }
             catch (Exception ex) { error = ex.Message; }
-            snapshot = new FanSnapshot(now, temp, rpms, _applied, _config.Mode, _override, error);
+            snapshot = new FanSnapshot(DateTime.UtcNow, temp, rpms, _applied, _config.Mode, _override, error);
         }
         Updated?.Invoke(snapshot);
     }
 
     /// <summary>Null means "let ASUS control the fans".</summary>
-    int? ComputeTarget(int? temp, DateTime now)
+    int? ComputeTarget(int? temp, TimeSpan now)
     {
         var config = _config;
         if (config.Mode == FanMode.AsusAuto)
         {
             _override = false;
+            _missedTemps = 0;
             return null;
         }
 
         if (temp is int t)
         {
+            _missedTemps = 0;
             if (t >= config.OverrideTemp) _override = true;
             else if (_override && t <= config.OverrideTemp - OverrideRelease) _override = false;
             _smoothedTemp = _smoothedTemp is double s ? s + TempSmoothing * (t - s) : t;
+        }
+        else if (++_missedTemps >= MaxMissedTemps)
+        {
+            // Blind: the thermal override can't fire, so a fixed low speed isn't safe. Let the firmware drive.
+            if (_missedTemps == MaxMissedTemps) Log.Write("No CPU temperature for 5 s, handing fans to ASUS");
+            return null;
         }
         if (_override) return 100;
 
@@ -163,12 +199,11 @@ public sealed class FanEngine : IDisposable
             target = CurveStep(config.Curve, smoothed, now);
         }
 
-        int floor = config.ForbidUnsafe ? SafeFloorPercent : MinPercent;
-        return Math.Clamp(target, floor, 100);
+        return Math.Clamp(target, MinPercent, 100);
     }
 
     /// <summary>Rises immediately; falls only once the curve 3 C hotter is still lower, for 5 s.</summary>
-    int CurveStep(FanCurve curve, double temp, DateTime now)
+    int CurveStep(FanCurve curve, double temp, TimeSpan now)
     {
         double raw = curve.Evaluate(temp);
         if (raw >= _curveOutput)
@@ -196,7 +231,7 @@ public sealed class FanEngine : IDisposable
         return (int)Math.Round(_curveOutput);
     }
 
-    void Apply(int? target, DateTime now)
+    void Apply(int? target, TimeSpan now)
     {
         bool changed = target != _applied && (
             target is null || _applied is null ||
@@ -218,7 +253,10 @@ public sealed class FanEngine : IDisposable
 
     public void Dispose()
     {
-        if (_running) Stop(restoreAsus: false);
+        bool running;
+        lock (_gate) running = _running;
+        if (running) Stop(restoreAsus: false);
+        // A thread stuck past the join timeout may still wait on _wake; Loop tolerates its disposal.
         _wake.Dispose();
     }
 }

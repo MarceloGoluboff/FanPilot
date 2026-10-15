@@ -21,6 +21,12 @@ internal sealed class FanService : ServiceBase
 
     protected override void OnStart(string[] args)
     {
+        // A crash must not leave the fans parked at a fixed duty. SCM restarts the service after.
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            Log.Write($"Unhandled: {e.ExceptionObject}");
+            _host?.EmergencyRestore();
+        };
         _host = new FanHost();
         _host.Start();
     }

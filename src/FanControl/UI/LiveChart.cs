@@ -17,6 +17,8 @@ public sealed class LiveChart : FrameworkElement
 
     public void Add(FanSnapshot snapshot)
     {
+        // A clock correction can put old samples "in the future"; they'd draw past the right edge.
+        _samples.RemoveAll(s => s.Time > snapshot.Time);
         _samples.Add(snapshot);
         var cutoff = snapshot.Time - Window;
         int stale = _samples.FindIndex(s => s.Time >= cutoff);

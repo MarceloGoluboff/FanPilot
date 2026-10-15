@@ -64,7 +64,8 @@ public sealed class MainViewModel : ObservableObject
 
     public ObservableCollection<StatItem> Stats { get; }
     public IReadOnlyList<Preset> Presets { get; } =
-        [new("Silent", 40), new("Balanced", 60), new("Performance", 80), new("Max", 100)];
+        // On the Q530VJ: 25% is about 2,500 RPM (ASUS's own idle speed), 45% about 3,700, 70% about 5,000.
+        [new("Silent", 25), new("Balanced", 45), new("Performance", 70), new("Max", 100)];
 
     public ICommand PresetCommand { get; }
     public ICommand ResetCurveCommand { get; }
@@ -156,8 +157,6 @@ public sealed class MainViewModel : ObservableObject
         Raise(nameof(IsCurveMode));
         Raise(nameof(ModeDescription));
         Raise(nameof(ManualPercent));
-        Raise(nameof(MinManualPercent));
-        Raise(nameof(ForbidUnsafe));
         Raise(nameof(OverrideTemp));
     }
 
@@ -184,19 +183,13 @@ public sealed class MainViewModel : ObservableObject
         set { if (value != _config.ManualPercent) Update(c => c with { ManualPercent = value }); }
     }
 
-    public int MinManualPercent => _config.MinPercent;
+    public int MinManualPercent => FanEngine.MinPercent;
 
     /// <summary>A copy for the curve editor, which edits it in place.</summary>
     public FanCurve CurveForEditor() => _config.Curve.Clone();
 
     /// <summary>Called by the curve editor after a drag, add or remove.</summary>
     public void CurveEdited(FanCurve curve) => Update(c => c with { Curve = curve.Clone() });
-
-    public bool ForbidUnsafe
-    {
-        get => _config.ForbidUnsafe;
-        set { if (value != _config.ForbidUnsafe) Update(c => c with { ForbidUnsafe = value }); }
-    }
 
     public IReadOnlyList<int> OverrideTemps { get; } = [85, 90, 95, 100];
 

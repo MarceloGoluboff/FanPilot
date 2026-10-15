@@ -3,11 +3,12 @@ param([switch]$SkipInstaller)
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
+# The installer ships everything in publish\, so start clean.
+Remove-Item "$root\publish" -Recurse -Force -ErrorAction SilentlyContinue
 
 dotnet publish "$root\src\FanControl\FanControl.csproj" `
     -c Release -r win-x64 --self-contained true `
     -p:PublishSingleFile=true `
-    -p:IncludeNativeLibrariesForSelfExtract=true `
     -p:EnableCompressionInSingleFile=true `
     -p:DebugType=none `
     -o "$root\publish"

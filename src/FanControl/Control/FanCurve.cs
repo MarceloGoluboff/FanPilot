@@ -18,7 +18,8 @@ public sealed class FanCurve
 
     public static FanCurve CreateDefault() => new()
     {
-        Points = [new(40, 30), new(60, 50), new(75, 75), new(85, 100)],
+        // Roughly ASUS's idle speed (25%) through the low 60s, full speed by 90 C.
+        Points = [new(60, 25), new(72, 45), new(82, 75), new(90, 100)],
     };
 
     public FanCurve Clone() => new() { Points = Points.Select(p => new CurvePoint(p.Temp, p.Percent)).ToList() };
@@ -43,16 +44,24 @@ public sealed class FanCurve
         return sorted[^1].Percent;
     }
 
-    /// <summary>Repairs a curve loaded from disk: in range, sorted, at least two points.</summary>
+    public const double MinGap = 2;   // C between points; the editor relies on it to keep drag bounds valid
+
+    /// <summary>
+    /// Repairs a curve from disk or the pipe: no nulls, in range, sorted, points at least 2 C
+    /// apart, two to eight points. Anything unusable becomes the default curve.
+    /// </summary>
     public FanCurve Normalized(int minPercent)
     {
-        var points = Points
-            .Where(p => double.IsFinite(p.Temp) && double.IsFinite(p.Percent))
-            .Select(p => new CurvePoint(
-                Math.Clamp(p.Temp, MinTemp, MaxTemp),
-                Math.Clamp(p.Percent, minPercent, 100)))
-            .OrderBy(p => p.Temp)
-            .ToList();
-        return points.Count >= 2 ? new FanCurve { Points = points } : CreateDefault();
+        var points = new List<CurvePoint>();
+        foreach (var p in (Points ?? []).Where(p => p is not null && double.IsFinite(p.Temp) && double.IsFinite(p.Percent))
+                                        .OrderBy(p => p.Temp))
+        {
+            var point = new CurvePoint(
+                Math.Round(Math.Clamp(p.Temp, MinTemp, MaxTemp)),
+                Math.Round(Math.Clamp(p.Percent, minPercent, 100)));
+            if (points.Count > 0 && point.Temp - points[^1].Temp < MinGap) continue;
+            points.Add(point);
+        }
+        return points.Count is >= 2 and <= 8 ? new FanCurve { Points = points } : CreateDefault();
     }
 }

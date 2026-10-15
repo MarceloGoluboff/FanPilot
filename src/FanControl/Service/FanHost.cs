@@ -87,10 +87,14 @@ internal sealed class FanHost : IDisposable
             if (config.Mode != _config.Mode) Log.Write($"Mode -> {config.Mode}");
             _config = config;
             _engine?.Configure(config);
+            // Inside the lock so two windows' edits are saved and echoed in the order they were applied.
+            config.Save();
+            _pipe.Broadcast(new PipeMessage { Type = PipeMessage.Config, FanConfig = config });
         }
-        config.Save();
-        _pipe.Broadcast(new PipeMessage { Type = PipeMessage.Config, FanConfig = config });
     }
+
+    /// <summary>Crash path: no locks, just try to hand the fans back.</summary>
+    public void EmergencyRestore() => _engine?.EmergencyRestore();
 
     public void OnResume()
     {

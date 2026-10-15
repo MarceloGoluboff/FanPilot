@@ -31,7 +31,17 @@ public sealed class CurveEditor : FrameworkElement
     public FanCurve Curve
     {
         get => _curve;
-        set { _curve = value; InvalidateVisual(); }
+        set
+        {
+            // A replacement mid-drag (another window's edit) orphans the dragged point; drop the drag.
+            if (_dragging is not null)
+            {
+                _dragging = null;
+                ReleaseMouseCapture();
+            }
+            _curve = value;
+            InvalidateVisual();
+        }
     }
 
     public double? CurrentTemp
@@ -85,7 +95,7 @@ public sealed class CurveEditor : FrameworkElement
         if (e.ClickCount == 2 && hit is null && _curve.Points.Count < MaxPoints)
         {
             var (t, pct) = FromScreen(pos);
-            if (t > FanCurve.MinTemp && t < FanCurve.MaxTemp && _curve.Points.All(p => Math.Abs(p.Temp - t) >= 2))
+            if (t > FanCurve.MinTemp && t < FanCurve.MaxTemp && _curve.Points.All(p => Math.Abs(p.Temp - t) >= FanCurve.MinGap))
             {
                 _curve.Points.Add(new CurvePoint(t, Math.Clamp(pct, _minPercent, 100)));
                 _curve.Points.Sort((a, b) => a.Temp.CompareTo(b.Temp));
@@ -113,8 +123,10 @@ public sealed class CurveEditor : FrameworkElement
         // A point stays between its neighbours so the curve remains a function of temperature.
         var sorted = _curve.Points.OrderBy(p => p.Temp).ToList();
         int i = sorted.IndexOf(_dragging);
-        double lo = i > 0 ? sorted[i - 1].Temp + 1 : FanCurve.MinTemp;
-        double hi = i < sorted.Count - 1 ? sorted[i + 1].Temp - 1 : FanCurve.MaxTemp;
+        if (i < 0) return;
+        // Same spacing FanCurve.Normalized enforces, or the service would drop the point.
+        double lo = i > 0 ? sorted[i - 1].Temp + FanCurve.MinGap : FanCurve.MinTemp;
+        double hi = i < sorted.Count - 1 ? sorted[i + 1].Temp - FanCurve.MinGap : FanCurve.MaxTemp;
 
         var (t, pct) = FromScreen(pos);
         _dragging.Temp = Math.Clamp(t, lo, hi);
@@ -122,11 +134,17 @@ public sealed class CurveEditor : FrameworkElement
         InvalidateVisual();
     }
 
-    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e) => EndDrag();
+
+    /// <summary>Alt-Tab mid-drag takes capture away without a button-up; commit what was dragged.</summary>
+    protected override void OnLostMouseCapture(MouseEventArgs e) => EndDrag();
+
+    void EndDrag()
     {
         if (_dragging is null) return;
         _dragging = null;
-        ReleaseMouseCapture();
+        if (IsMouseCaptured) ReleaseMouseCapture();
+        InvalidateVisual();
         CurveChanged?.Invoke();
     }
 

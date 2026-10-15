@@ -46,37 +46,44 @@ internal sealed class PipeServer : IDisposable
         return security;
     }
 
+    /// <summary>Never exits until disposed: if it died, no window could reach the fans again.</summary>
     async Task AcceptLoop()
     {
         var security = CreateSecurity();
         bool first = true;
+        string? lastError = null;
         while (!_cts.IsCancellationRequested)
         {
-            NamedPipeServerStream pipe;
+            NamedPipeServerStream? pipe = null;
             try
             {
                 var options = PipeOptions.Asynchronous | (first ? PipeOptions.FirstPipeInstance : PipeOptions.None);
                 pipe = NamedPipeServerStreamAcl.Create(Protocol.PipeName, PipeDirection.InOut, MaxClients,
                     PipeTransmissionMode.Byte, options, 0, 0, security);
                 first = false;
-            }
-            catch (IOException)
-            {
-                // All instances busy, or a stale instance from a previous run.
-                await Task.Delay(1000, _cts.Token).ContinueWith(_ => { });
-                continue;
-            }
-
-            try
-            {
                 await pipe.WaitForConnectionAsync(_cts.Token);
+                var connected = pipe;
+                pipe = null;
+                lastError = null;
+                _ = Task.Run(() => Serve(connected));
             }
             catch (OperationCanceledException)
             {
-                await pipe.DisposeAsync();
-                return;
+                break;
             }
-            _ = Task.Run(() => Serve(pipe));
+            catch (Exception ex)
+            {
+                // All instances busy, a client that hung up before we accepted, or someone else
+                // holding the name (FirstPipeInstance refuses to share it).
+                if (ex.Message != lastError) Log.Write($"Pipe accept failed: {ex.Message}");
+                lastError = ex.Message;
+                try { await Task.Delay(1000, _cts.Token); }
+                catch (OperationCanceledException) { break; }
+            }
+            finally
+            {
+                if (pipe is not null) await pipe.DisposeAsync();
+            }
         }
     }
 
@@ -87,8 +94,10 @@ internal sealed class PipeServer : IDisposable
             FullMode = BoundedChannelFullMode.DropOldest,
             SingleReader = true,
         });
-        queue.Writer.TryWrite(Protocol.Serialize(_greeting()));
+        // Join the broadcast list before building the greeting, so a status change in between
+        // isn't missed. A broadcast may then arrive before the greeting; the window handles either order.
         lock (_clients) _clients.Add(queue);
+        queue.Writer.TryWrite(Protocol.Serialize(_greeting()));
 
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
         try
@@ -106,7 +115,9 @@ internal sealed class PipeServer : IDisposable
             {
                 string? line = await reader.ReadLineAsync(linked.Token);
                 if (line is null) break;
-                if (Protocol.Deserialize(line) is { } message) _received(message);
+                if (Protocol.Deserialize(line) is not { } message) continue;
+                try { _received(message); }
+                catch (Exception ex) { Log.Write($"Bad message from window: {ex.Message}"); }
             }
 
             linked.Cancel();
