@@ -5,7 +5,9 @@ temperature curve you draw yourself, from a window or the tray. FanPilot measure
 it never runs them slower than they can safely spin, and hands control back to ASUS whenever
 something looks wrong.
 
-![FanPilot window](docs/screenshot.png)
+<p align="center">
+  <img src="docs/screenshot.png" width="460" alt="FanPilot in Curve mode: CPU, GPU and fan readings, a two-minute chart, and the temperature curve editor">
+</p>
 
 ## Features
 
@@ -26,6 +28,11 @@ something looks wrong.
   icon run as you. Pin FanPilot to the taskbar and it opens like any other app.
 - **Copy diagnostics.** One button copies your model, driver versions, fan setup results and
   recent log, ready to paste into a bug report.
+
+<p align="center">
+  <img src="docs/screenshot-manual.png" width="49%" alt="Manual mode with the speed slider and the Silent, Balanced, Performance and Max presets">
+  <img src="docs/screenshot-settings.png" width="49%" alt="Settings: fan setup results, CPU and GPU thermal overrides, tray and theme options, and Copy diagnostics">
+</p>
 
 ## Safety
 
