@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Test
+        run: dotnet test tests/FanPilot.Tests -c Release
+
+      # Not guaranteed to be on the runner image, so install it explicitly.
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Build installer
+        shell: pwsh
+        run: ./scripts/build.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FanPilot-installer
+          path: dist/FanPilot-Setup-*.exe
+          if-no-files-found: error

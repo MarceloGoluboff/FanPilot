@@ -1,0 +1,49 @@
+name: Compatibility report
+description: Tell us whether FanPilot works on your laptop, so others know.
+labels: [compatibility]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Reports from every ASUS laptop help, whether FanPilot works or not. They go into docs/COMPATIBILITY.md.
+  - type: dropdown
+    id: works
+    attributes:
+      label: Does FanPilot control your fans?
+      options:
+        - Yes, all fans
+        - Some fans only
+        - No
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Laptop model
+      placeholder: e.g. ASUS TUF Gaming F15 FX507ZM
+    validations:
+      required: true
+  - type: input
+    id: bios
+    attributes:
+      label: BIOS version
+      description: In the diagnostics output, or System Information.
+  - type: input
+    id: driver
+    attributes:
+      label: ASUS System Control Interface driver version
+      description: In the diagnostics output, or Device Manager > System devices.
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: |
+        Run fan setup first if you can. Then open Settings > Diagnostics > Copy diagnostics, and paste here.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Anything odd, like a fan that doesn't respond, temperatures that look wrong, or noise.

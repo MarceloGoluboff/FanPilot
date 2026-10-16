@@ -1,0 +1,63 @@
+name: Release
+
+# Push a tag like v2.0.0 that matches the Version in Directory.Build.props, with a matching
+# "## [2.0.0]" section in CHANGELOG.md.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Check the tag matches the version
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME.TrimStart('v')
+          $version = (dotnet msbuild src/FanPilot/FanPilot.csproj -getProperty:Version).Trim()
+          if ($tag -ne $version) { throw "Tag v$tag doesn't match Directory.Build.props version $version" }
+
+      - name: Test
+        run: dotnet test tests/FanPilot.Tests -c Release
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Build installer
+        shell: pwsh
+        run: ./scripts/build.ps1
+
+      - name: Checksums and release notes
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          $installer = Get-Item "dist/FanPilot-Setup-$version.exe"
+          $hash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $($installer.Name)" | Set-Content dist/SHA256SUMS.txt -Encoding ascii
+
+          # The CHANGELOG section for this version, without its heading.
+          $lines = Get-Content CHANGELOG.md
+          $start = ($lines | Select-String -Pattern "^## \[$([regex]::Escape($version))\]").LineNumber
+          if (-not $start) { throw "CHANGELOG.md has no section for $version" }
+          $rest = $lines[$start..($lines.Count - 1)]
+          $end = ($rest | Select-String -Pattern '^## \[' | Select-Object -First 1).LineNumber
+          $section = if ($end) { $rest[0..($end - 2)] } else { $rest }
+          $section + '', "SHA-256: ``$hash``" | Set-Content release-notes.md -Encoding utf8
+
+      - name: Publish the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          gh release create $env:GITHUB_REF_NAME "dist/FanPilot-Setup-$version.exe" dist/SHA256SUMS.txt `
+            --title "FanPilot $version" --notes-file release-notes.md

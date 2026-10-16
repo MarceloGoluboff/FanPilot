@@ -1,5 +1,5 @@
-# Draws the fan icon and writes a multi-size .ico (PNG frames) to src/FanControl/Assets/fan.ico.
-param([string]$Out = (Join-Path $PSScriptRoot '..\src\FanControl\Assets\fan.ico'))
+# Draws the fan icon and writes a multi-size .ico (PNG frames) to src/FanPilot/Assets/fan.ico.
+param([string]$Out = (Join-Path $PSScriptRoot '..\src\FanPilot\Assets\fan.ico'))
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing

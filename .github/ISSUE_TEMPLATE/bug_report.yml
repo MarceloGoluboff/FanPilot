@@ -1,0 +1,45 @@
+name: Bug report
+description: Something in FanPilot doesn't work as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. If this is a security problem, please don't file it here; see SECURITY.md.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Laptop model
+      placeholder: e.g. ASUS Vivobook 15X Q530VJ
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: FanPilot version
+      description: Shown at the bottom of the FanPilot window.
+      placeholder: e.g. 2.0.0
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: |
+        In FanPilot, open Settings > Diagnostics > Copy diagnostics, and paste here.
+        It includes the model, BIOS, ASUS driver version, fan setup results and recent log, with your user name removed.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: other
+    attributes:
+      label: Anything else?
+      description: Other fan or ASUS software you run (Armoury Crate, G-Helper, MyASUS), screenshots, etc.

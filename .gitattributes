@@ -1,0 +1,10 @@
+* text=auto
+
+*.ico binary
+*.png binary
+*.jpg binary
+
+# Inno Setup and batch files are read by Windows tools.
+*.iss text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf

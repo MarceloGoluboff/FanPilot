@@ -1,0 +1,13 @@
+<Project>
+  <!-- Single source for version and metadata. scripts\build.ps1 passes Version to the installer. -->
+  <PropertyGroup>
+    <Version>2.0.0</Version>
+    <Product>FanPilot</Product>
+    <Company>Marcelo Goluboff</Company>
+    <Authors>Marcelo Goluboff</Authors>
+    <Copyright>Copyright (c) 2026 Marcelo Goluboff</Copyright>
+    <RepositoryUrl>https://github.com/MarceloGoluboff/FanPilot</RepositoryUrl>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+</Project>
