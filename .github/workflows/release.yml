@@ -42,7 +42,8 @@ jobs:
           $version = $env:GITHUB_REF_NAME.TrimStart('v')
           $installer = Get-Item "dist/FanPilot-Setup-$version.exe"
           $hash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  $($installer.Name)" | Set-Content dist/SHA256SUMS.txt -Encoding ascii
+          # LF line ending, so `sha256sum -c` works on Linux and macOS too.
+          [IO.File]::WriteAllText("$PWD/dist/SHA256SUMS.txt", "$hash  $($installer.Name)`n")
 
           # The CHANGELOG section for this version, without its heading.
           $lines = Get-Content CHANGELOG.md
