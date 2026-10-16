@@ -1,7 +1,7 @@
 name: Release
 
-# Push a tag like v2.0.0 that matches the Version in Directory.Build.props, with a matching
-# "## [2.0.0]" section in CHANGELOG.md.
+# Push a tag like v1.0.0 that matches the Version in Directory.Build.props, with a matching
+# "## [1.0.0]" section in CHANGELOG.md.
 on:
   push:
     tags: ['v*']
@@ -49,7 +49,7 @@ jobs:
           $start = ($lines | Select-String -Pattern "^## \[$([regex]::Escape($version))\]").LineNumber
           if (-not $start) { throw "CHANGELOG.md has no section for $version" }
           $rest = $lines[$start..($lines.Count - 1)]
-          $end = ($rest | Select-String -Pattern '^## \[' | Select-Object -First 1).LineNumber
+          $end = ($rest | Select-String -Pattern '^## ' | Select-Object -First 1).LineNumber
           $section = if ($end) { $rest[0..($end - 2)] } else { $rest }
           $section + '', "SHA-256: ``$hash``" | Set-Content release-notes.md -Encoding utf8
 

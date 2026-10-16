@@ -341,8 +341,8 @@
                 </ui:Card>
 
                 <TextBlock Margin="4,14,8,0" Style="{StaticResource Secondary}">
-                    <Run Text="{Binding VersionText, Mode=OneWay}" />
-                    <Run Text=". Uses ASUS's AsusWinIO64 library from the ASUS System Control Interface driver. Not affiliated with ASUS." />
+                    <!-- Both runs on one line: a line break between them renders as a space before the period. -->
+                    <Run Text="{Binding VersionText, Mode=OneWay}" /><Run Text=". Uses ASUS's AsusWinIO64 library from the ASUS System Control Interface driver. Not affiliated with ASUS." />
                 </TextBlock>
             </StackPanel>
         </ScrollViewer>
